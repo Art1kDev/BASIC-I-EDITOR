@@ -5,28 +5,30 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>BASIC</title>
 <style>
-body{margin:0;background:#000;color:#0f0;font-family:monospace}
+@font-face{font-family:'1C';src:url('1C.ttf') format('truetype')}
+body{margin:0;background:#000;color:#0f0;font-family:'1C',monospace}
 .screen{display:flex;flex-direction:column;height:100vh}
-.top{display:flex;gap:6px;padding:8px;border-bottom:2px solid #0f0;flex-wrap:wrap}
-button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:monospace;font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px;outline:none}
-.output{flex:1;position:relative;overflow:auto;white-space:pre-wrap;font-size:18px;line-height:1.4em;padding:12px}
+.top{display:flex;gap:6px;padding:8px;border-bottom:2px solid #0f0;flex-wrap:wrap;user-select:none}
+button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:'1C';font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px;outline:none;user-select:none}
+select{appearance:none;-webkit-appearance:none;-moz-appearance:none}
+.output{flex:1;padding:12px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;font-size:18px;line-height:1.4em;position:relative}
 #gfx{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
-input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:monospace;font-size:20px;padding:14px;border-top:2px solid #0f0}
+input{width:100%;box-sizing:border-box;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0;border-radius:0}
 </style>
 </head>
 <body>
 <div class="screen">
 <div class="top">
-<button onclick="RUN()">RUN</button>
-<button onclick="LIST()">LIST</button>
-<button onclick="NEW()">NEW</button>
-<select id="mode" onchange="CHANGE_MODE()">
+<button tabindex="-1" onclick="RUN();blurInput()">RUN</button>
+<button tabindex="-1" onclick="LIST();blurInput()">LIST</button>
+<button tabindex="-1" onclick="NEW();blurInput()">NEW</button>
+<select id="mode" tabindex="-1" onchange="CHANGE_MODE();blurInput()">
 <option value="0">OLD BASIC</option>
 <option value="1">APPLESOFT BASIC</option>
 <option value="2">QBASIC</option>
 </select>
-<button onclick="SAVE()">SAVE</button>
-<button onclick="OPEN()">OPEN</button>
+<button tabindex="-1" onclick="SAVE();blurInput()">SAVE</button>
+<button tabindex="-1" onclick="OPEN();blurInput()">OPEN</button>
 </div>
 <div class="output" id="out">
 <canvas id="gfx"></canvas>
@@ -37,8 +39,7 @@ input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family
 <script>
 let P={},V={},D=[],DP=0,FS=[],GS=[],R=false,LP=0,mode=0,seed=Math.random(),inputResolve=null
 let out=document.getElementById("out")
-let canvas=document.getElementById("gfx")
-let ctx=canvas.getContext("2d")
+let canvas=document.getElementById("gfx"),ctx=canvas.getContext("2d")
 function resizeCanvas(){canvas.width=out.clientWidth;canvas.height=out.clientHeight}
 resizeCanvas()
 window.addEventListener('resize',resizeCanvas)
@@ -50,57 +51,51 @@ if(localStorage.getItem("saved_program")){
 function SAVE_LOCAL(){localStorage.setItem("saved_program",JSON.stringify({P:P,mode:mode}))}
 function O(t){out.innerHTML+=t+"\n";out.scrollTop=out.scrollHeight}
 function CHANGE_MODE(){mode=+document.getElementById("mode").value;SAVE_LOCAL()}
-
-function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=Object.keys(P).map(Number).sort((a,b)=>a-b);if(!l.length)return;EXEC(l[0])}
+function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=K();if(!l.length)return;EXEC(l[0])}
 function EXEC(n){if(!R||!P[n]){R=false;return}LP=n;mode==0?BPROC(P[n]):mode==1?APROC(P[n]):QBPROC(P[n])}
-function NEXT(){let l=Object.keys(P).map(Number).sort((a,b)=>a-b);let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false)}
+function NEXT(){let l=K();let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false)}
 function J(t){P[t]?EXEC(t):(R=false)}
+function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
 function E(e){e=e.replace(/\$/g,"");for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v]);try{return eval(e)||0}catch{return 0}}
 function RND(x){if(x<0)seed=-x;seed=(seed*16807)%2147483647;return seed/2147483647}
-function waitForInput(promptText,varName,isString){O(promptText);cmd.disabled=false;cmd.focus();return new Promise(resolve=>{inputResolve=(val)=>{V[varName]=isString?val:parseFloat(val)||0;inputResolve=null;resolve();cmd.disabled=false;}})}
-
 function PRINTLINE(s){let r="",p="",m=0;for(let i=0;i<s.length;i++){let c=s[i];if(c=='"')m^=1;if(!m&&(c==';'||c==',')){r+=E(p);if(c==',')r+="\t";p=""}else p+=c}r+=E(p);out.innerHTML+=r;if(!s.trim().endsWith(";"))out.innerHTML+="\n";out.scrollTop=out.scrollHeight}
 
 function BPROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}else if(w=="GOTO")J(+a);else if(w=="END"||w=="STOP")R=false;else NEXT()}
-function APROC(line){BPROC(line)}
+function APROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a,p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";waitForInput(p,v,v.endsWith("$")).then(NEXT);return}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):APROC(t)):NEXT()}else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}else if(w=="RESTORE"){DP=0;NEXT()}else if(w=="GOTO")J(+a);else if(w=="GOSUB"){GS.push(LP);J(+a)}else if(w=="RETURN"){LP=GS.pop();NEXT()}else if(w=="END")R=false;else if(w=="HOME"){out.innerHTML="";NEXT()}else NEXT()}
 
 function QBPROC(line){
 let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim()
 if(w=="PRINT"){PRINTLINE(a);NEXT()}
-else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
+else if(w=="LET"||w=="DIM"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
 else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a,p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";waitForInput(p,v,v.endsWith("$")).then(NEXT);return}
-else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}
+else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):QBPROC(t)):NEXT()}
+else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}
 else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}
+else if(w=="WHILE"){FS.push({w:a,l:LP});NEXT()}
+else if(w=="WEND"){let f=FS[FS.length-1];if(E(f.w)){EXEC(f.l)}else{FS.pop();NEXT()}}
+else if(w=="DO"){FS.push({d:a,l:LP});NEXT()}
+else if(w=="LOOP"){let f=FS[FS.length-1];if(E(f.d)){EXEC(f.l)}else{FS.pop();NEXT()}}
 else if(w=="GOTO")J(+a)
 else if(w=="GOSUB"){GS.push(LP);J(+a)}
 else if(w=="RETURN"){LP=GS.pop();NEXT()}
 else if(w=="END")R=false
 else if(w=="CLS"){out.innerHTML="";ctx.clearRect(0,0,canvas.width,canvas.height);NEXT()}
-else if(w=="SCREEN"){ctx.clearRect(0,0,canvas.width,canvas.height);NEXT()}
+else if(w=="SCREEN"){canvas.width=out.clientWidth;canvas.height=out.clientHeight;ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);NEXT()}
 else if(w=="PSET"||w=="PRESET"){let m=a.match(/\((\d+),\s*(\d+)\),\s*(\d+)/);if(m){ctx.fillStyle="hsl("+(m[3]*24)+",100%,50%)";ctx.fillRect(+m[1],+m[2],1,1)}NEXT()}
 else if(w=="LINE"){let m=a.match(/\((\d+),(\d+)\)-\((\d+),(\d+)\),\s*(\d+)/);if(m){ctx.strokeStyle="hsl("+(m[5]*24)+",100%,50%)";ctx.beginPath();ctx.moveTo(+m[1],+m[2]);ctx.lineTo(+m[3],+m[4]);ctx.stroke()}}NEXT()
-else if(w=="CIRCLE"){let m=a.match(/\((\d+),(\d+)\),(\d+)/);if(m){ctx.beginPath();ctx.arc(+m[1],+m[2],+m[3],0,2*Math.PI);ctx.stroke()}}NEXT()
+else if(w=="CIRCLE"){let m=a.match(/\((\d+),(\d+)\),(\d+),\s*(\d*)/);if(m){ctx.strokeStyle="hsl("+(m[4]?m[4]*24:120)+",100%,50%)";ctx.beginPath();ctx.arc(+m[1],+m[2],+m[3],0,2*Math.PI);ctx.stroke()}}NEXT()
 else NEXT()
 }
 
-function CMD(){
-let t=cmd.value.trim();cmd.value=""
-if(!t)return
-if(inputResolve){inputResolve(t);return}
-SAVE_LOCAL()
-if(/^\d+/.test(t)){
-let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];SAVE_LOCAL();return
-}
-if(t.toUpperCase()=="RUN"){RUN()}
-else if(t.toUpperCase()=="LIST"){LIST()}
-else if(t.toUpperCase()=="NEW"){NEW()}
-}
+function waitForInput(promptText,varName,isString){O(promptText);cmd.disabled=false;cmd.focus();return new Promise(resolve=>{inputResolve=(val)=>{V[varName]=isString?val:parseFloat(val)||0;inputResolve=null;resolve();cmd.disabled=false;}})}
 
-function LIST(){out.innerHTML="";Object.keys(P).map(Number).sort((a,b)=>a-b).forEach(n=>O(n+" "+P[n]))}
+function CMD(){let t=cmd.value.trim();cmd.value="";if(!t)return;if(inputResolve){inputResolve(t);return}SAVE_LOCAL();if(/^\d+/.test(t)){let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];SAVE_LOCAL();return}if(t.toUpperCase()=="RUN"){RUN()}else if(t.toUpperCase()=="LIST"){LIST()}else if(t.toUpperCase()=="NEW"){NEW()}}
+function LIST(){out.innerHTML="";K().forEach(n=>{O(n+" "+P[n])})}
 function NEW(){P={};out.innerHTML="";ctx.clearRect(0,0,canvas.width,canvas.height);SAVE_LOCAL()}
-function SAVE(){let s=Object.keys(P).map(Number).sort((a,b)=>a-b).map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
+function SAVE(){let s=K().map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
 function OPEN(){file.click()}
 function LOADFILE(f){let r=new FileReader();r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)});SAVE_LOCAL()};r.readAsText(f)}
+function blurInput(){setTimeout(()=>{document.getElementById("cmd").blur()},50)}
 </script>
 </body>
 </html>
