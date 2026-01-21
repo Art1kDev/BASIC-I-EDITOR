@@ -9,7 +9,7 @@
 body{margin:0;background:#000;color:#0f0;font-family:'1C',monospace}
 .screen{display:flex;flex-direction:column;height:100vh}
 .top{display:flex;gap:6px;padding:8px;border-bottom:2px solid #0f0;flex-wrap:wrap;user-select:none}
-button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:'1C';font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px}
+button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:'1C';font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px;outline:none;user-select:none}
 select{appearance:none;-webkit-appearance:none;-moz-appearance:none}
 .output{flex:1;padding:12px;overflow:auto;white-space:pre-wrap;font-size:18px;line-height:1.4em}
 input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0;border-radius:0}
@@ -18,15 +18,15 @@ input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family
 <body>
 <div class="screen">
 <div class="top">
-<button onclick="RUN();blurButton()">RUN</button>
-<button onclick="LIST();blurButton()">LIST</button>
-<button onclick="NEW();blurButton()">NEW</button>
-<select id="mode" onchange="CHANGE_MODE();blurButton()">
+<button tabindex="-1" onclick="RUN();blurInput()">RUN</button>
+<button tabindex="-1" onclick="LIST();blurInput()">LIST</button>
+<button tabindex="-1" onclick="NEW();blurInput()">NEW</button>
+<select id="mode" tabindex="-1" onchange="CHANGE_MODE();blurInput()">
 <option value="0">OLD BASIC</option>
 <option value="1">APPLESOFT BASIC</option>
 </select>
-<button onclick="SAVE();blurButton()">SAVE</button>
-<button onclick="OPEN();blurButton()">OPEN</button>
+<button tabindex="-1" onclick="SAVE();blurInput()">SAVE</button>
+<button tabindex="-1" onclick="OPEN();blurInput()">OPEN</button>
 </div>
 <div class="output" id="out"></div>
 <input id="cmd" onkeydown="if(event.key=='Enter')CMD()">
@@ -57,7 +57,7 @@ function NEW(){P={};out.innerHTML="";SAVE_LOCAL()}
 function SAVE(){let s=K().map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
 function OPEN(){file.click()}
 function LOADFILE(f){let r=new FileReader();r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)});SAVE_LOCAL()};r.readAsText(f)}
-function blurButton(){document.activeElement.blur()}
+function blurInput(){setTimeout(()=>{document.getElementById("cmd").blur()},50)}
 </script>
 </body>
 </html>
