@@ -1,0 +1,291 @@
+<html>
+<head>
+<title>BASICEDITOR</title>
+<style>
+body {
+    background: #000;
+    color: #0f0;
+    font-family: monospace;
+    margin: 0;
+    padding: 0;
+}
+#editor {
+    width: 100vw;
+    height: 70vh;
+    background: #000;
+    color: #0f0;
+    border: none;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    outline: none;
+}
+#output {
+    width: 100vw;
+    height: 25vh;
+    background: #000;
+    color: #0f0;
+    border-top: 1px solid #0f0;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    overflow: auto;
+    white-space: pre-wrap;
+}
+.buttons {
+    padding: 5px;
+    border-bottom: 1px solid #0f0;
+}
+button {
+    background: #000;
+    color: #0f0;
+    border: 1px solid #0f0;
+    font-family: monospace;
+    padding: 5px 10px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div class="buttons">
+<button onclick="RUN()">RUN</button>
+<button onclick="SAVE()">SAVE</button>
+<button onclick="OPEN()">OPEN</button>
+</div>
+<textarea id="editor"></textarea>
+<div id="output">READY</div>
+<script>
+let V = {};
+let P = [];
+let D = [];
+let DP = 0;
+let FS = [];
+let GS = [];
+let R = false;
+let LP = 0;
+
+function POUT(t) {
+    document.getElementById('output').innerHTML += t + '\n';
+    document.getElementById('output').scrollTop = 9999;
+}
+
+function CLR() {
+    document.getElementById('output').innerHTML = '';
+}
+
+function RUN() {
+    CLR();
+    V = {};
+    D = [];
+    DP = 0;
+    FS = [];
+    GS = [];
+    R = true;
+    LP = 0;
+    
+    let code = document.getElementById('editor').value;
+    P = code.split('\n').filter(l => l.trim()).map(l => {
+        let num = parseInt(l.trim().split(' ')[0]);
+        let txt = l.trim().substring(l.trim().indexOf(' ') + 1);
+        return {num, txt};
+    }).sort((a,b) => a.num - b.num);
+    
+    EXEC(0);
+}
+
+function EXEC(i) {
+    if (!R || i >= P.length) {
+        POUT("READY");
+        return;
+    }
+    
+    LP = i;
+    let line = P[i];
+    let parts = line.txt.split(' ');
+    let cmd = parts[0].toUpperCase();
+    let args = parts.slice(1).join(' ');
+    
+    setTimeout(() => {
+        try {
+            PROC(cmd, args, line.num);
+        } catch(e) {
+            POUT("ERROR: " + e);
+            R = false;
+        }
+    }, 10);
+}
+
+function PROC(cmd, args, ln) {
+    if (cmd === 'PRINT') {
+        let t = args;
+        for (let v in V) {
+            t = t.replace(new RegExp(v, 'g'), V[v]);
+        }
+        t = t.replace(/"/g, '');
+        POUT(t);
+        NEXT();
+    }
+    else if (cmd === 'INPUT') {
+        let vn = args.replace('"', '').trim();
+        let val = prompt('INPUT ' + vn + ':');
+        if (vn.endsWith('$')) {
+            V[vn] = val;
+        } else {
+            V[vn] = parseFloat(val) || 0;
+        }
+        POUT(val);
+        NEXT();
+    }
+    else if (cmd === 'LET') {
+        let m = args.match(/(\w+)\s*=\s*(.+)/);
+        if (m) {
+            V[m[1]] = EVAL(m[2]);
+        }
+        NEXT();
+    }
+    else if (cmd === 'DATA') {
+        D = args.split(',').map(x => x.trim());
+        DP = 0;
+        NEXT();
+    }
+    else if (cmd === 'READ') {
+        let vlist = args.split(',').map(x => x.trim());
+        vlist.forEach(v => {
+            if (DP < D.length) {
+                V[v] = D[DP++];
+            }
+        });
+        NEXT();
+    }
+    else if (cmd === 'IF') {
+        let ti = args.indexOf('THEN');
+        let cond = args.substring(0, ti).trim();
+        let thenc = args.substring(ti + 4).trim();
+        
+        if (COND(cond)) {
+            let tl = parseInt(thenc);
+            if (!isNaN(tl)) {
+                JUMP(tl);
+            } else {
+                PROC(thenc.split(' ')[0], thenc.split(' ').slice(1).join(' '), ln);
+            }
+        } else {
+            NEXT();
+        }
+    }
+    else if (cmd === 'FOR') {
+        let m = args.match(/(\w+)\s*=\s*(\d+)\s+TO\s+(\d+)/);
+        if (m) {
+            V[m[1]] = parseInt(m[2]);
+            FS.push({v: m[1], e: parseInt(m[3]), r: LP});
+        }
+        NEXT();
+    }
+    else if (cmd === 'NEXT') {
+        if (FS.length > 0) {
+            let f = FS[FS.length-1];
+            V[f.v]++;
+            if (V[f.v] <= f.e) {
+                LP = f.r;
+                EXEC(LP);
+            } else {
+                FS.pop();
+                NEXT();
+            }
+        } else {
+            NEXT();
+        }
+    }
+    else if (cmd === 'GOTO') {
+        let t = parseInt(args);
+        JUMP(t);
+    }
+    else if (cmd === 'GOSUB') {
+        let t = parseInt(args);
+        GS.push(LP);
+        JUMP(t);
+    }
+    else if (cmd === 'RETURN') {
+        if (GS.length > 0) {
+            LP = GS.pop();
+            NEXT();
+        }
+    }
+    else if (cmd === 'END' || cmd === 'STOP') {
+        R = false;
+        POUT("END");
+    }
+    else if (cmd === 'REM') {
+        NEXT();
+    }
+    else {
+        POUT("UNKNOWN: " + cmd);
+        NEXT();
+    }
+}
+
+function NEXT() {
+    if (R) {
+        LP++;
+        if (LP < P.length) {
+            EXEC(LP);
+        } else {
+            R = false;
+            POUT("READY");
+        }
+    }
+}
+
+function JUMP(tn) {
+    let idx = P.findIndex(l => l.num === tn);
+    if (idx >= 0) {
+        LP = idx;
+        EXEC(LP);
+    } else {
+        POUT("LINE " + tn + " NOT FOUND");
+        R = false;
+    }
+}
+
+function EVAL(e) {
+    e = e.replace(/\$/g, '');
+    for (let v in V) {
+        let cv = v.replace('$', '');
+        e = e.replace(new RegExp(cv, 'g'), V[v]);
+    }
+    try {
+        return eval(e) || 0;
+    } catch {
+        return e;
+    }
+}
+
+function COND(c) {
+    c = c.replace(/=/g, '==');
+    return eval(EVAL(c));
+}
+
+function SAVE() {
+    let n = prompt('FILENAME:');
+    if (n) {
+        localStorage.setItem('b_' + n, document.getElementById('editor').value);
+        POUT('SAVED: ' + n);
+    }
+}
+
+function OPEN() {
+    let n = prompt('FILENAME:');
+    if (n) {
+        let s = localStorage.getItem('b_' + n);
+        if (s) {
+            document.getElementById('editor').value = s;
+            POUT('LOADED: ' + n);
+        } else {
+            POUT('NOT FOUND');
+        }
+    }
+}
+</script>
+</body>
+</html>
