@@ -9,55 +9,71 @@ body {
     margin: 0;
     padding: 0;
 }
-#editor {
-    width: 100vw;
-    height: 70vh;
-    background: #000;
-    color: #0f0;
-    border: none;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    outline: none;
+.screen {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
-#output {
-    width: 100vw;
-    height: 25vh;
-    background: #000;
-    color: #0f0;
-    border-top: 1px solid #0f0;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    overflow: auto;
-    white-space: pre-wrap;
-}
-.buttons {
+.top-bar {
     padding: 5px;
     border-bottom: 1px solid #0f0;
+    display: flex;
+    gap: 5px;
 }
-button {
+.top-bar button {
     background: #000;
     color: #0f0;
     border: 1px solid #0f0;
     font-family: monospace;
     padding: 5px 10px;
-    margin-right: 5px;
     cursor: pointer;
+}
+.output {
+    flex: 1;
+    background: #000;
+    padding: 10px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+.input-line {
+    padding: 5px;
+    border-top: 1px solid #0f0;
+    display: flex;
+}
+.input-line span {
+    color: #0f0;
+    margin-right: 10px;
+}
+.input-line input {
+    flex: 1;
+    background: #000;
+    color: #0f0;
+    border: none;
+    outline: none;
+    font-family: monospace;
+    font-size: 14px;
 }
 </style>
 </head>
 <body>
-<div class="buttons">
+<div class="screen">
+<div class="top-bar">
 <button onclick="RUN()">RUN</button>
 <button onclick="SAVE()">SAVE</button>
 <button onclick="OPEN()">OPEN</button>
+<button onclick="NEW()">NEW</button>
+<button onclick="LIST()">LIST</button>
 </div>
-<textarea id="editor"></textarea>
-<div id="output">READY</div>
+<div class="output" id="output">READY
+</div>
+<div class="input-line">
+<span>></span>
+<input type="text" id="cmd" onkeydown="if(event.key=='Enter') PROC_CMD()">
+</div>
+</div>
 <script>
 let V = {};
-let P = [];
+let P = {};
 let D = [];
 let DP = 0;
 let FS = [];
@@ -65,17 +81,13 @@ let GS = [];
 let R = false;
 let LP = 0;
 
-function POUT(t) {
+function OUT(t) {
     document.getElementById('output').innerHTML += t + '\n';
     document.getElementById('output').scrollTop = 9999;
 }
 
-function CLR() {
-    document.getElementById('output').innerHTML = '';
-}
-
 function RUN() {
-    CLR();
+    OUT('RUN');
     V = {};
     D = [];
     DP = 0;
@@ -84,173 +96,161 @@ function RUN() {
     R = true;
     LP = 0;
     
-    let code = document.getElementById('editor').value;
-    P = code.split('\n').filter(l => l.trim()).map(l => {
-        let num = parseInt(l.trim().split(' ')[0]);
-        let txt = l.trim().substring(l.trim().indexOf(' ') + 1);
-        return {num, txt};
-    }).sort((a,b) => a.num - b.num);
-    
-    EXEC(0);
-}
-
-function EXEC(i) {
-    if (!R || i >= P.length) {
-        POUT("READY");
+    let lines = Object.keys(P).map(Number).sort((a,b) => a-b);
+    if(lines.length === 0) {
+        OUT('NO PROGRAM');
         return;
     }
-    
-    LP = i;
-    let line = P[i];
-    let parts = line.txt.split(' ');
+    EXEC(lines[0]);
+}
+
+function EXEC(ln) {
+    if(!R || !P[ln]) {
+        OUT('READY');
+        return;
+    }
+    LP = ln;
+    let line = P[ln];
+    let parts = line.split(' ');
     let cmd = parts[0].toUpperCase();
     let args = parts.slice(1).join(' ');
     
-    setTimeout(() => {
-        try {
-            PROC(cmd, args, line.num);
-        } catch(e) {
-            POUT("ERROR: " + e);
-            R = false;
-        }
-    }, 10);
+    try {
+        PROC(cmd, args, ln);
+    } catch(e) {
+        OUT('ERROR');
+        R = false;
+    }
 }
 
 function PROC(cmd, args, ln) {
-    if (cmd === 'PRINT') {
+    if(cmd === 'PRINT') {
         let t = args;
-        for (let v in V) {
+        for(let v in V) {
             t = t.replace(new RegExp(v, 'g'), V[v]);
         }
         t = t.replace(/"/g, '');
-        POUT(t);
+        OUT(t);
         NEXT();
     }
-    else if (cmd === 'INPUT') {
-        let vn = args.replace('"', '').trim();
-        let val = prompt('INPUT ' + vn + ':');
-        if (vn.endsWith('$')) {
-            V[vn] = val;
-        } else {
-            V[vn] = parseFloat(val) || 0;
+    else if(cmd === 'INPUT') {
+        let parts = args.split(',');
+        if(parts.length >= 2) {
+            let p = parts[0].replace(/"/g, '').trim();
+            let vn = parts[1].trim();
+            let val = prompt(p);
+            if(vn.endsWith('$')) V[vn] = val;
+            else V[vn] = parseFloat(val) || 0;
         }
-        POUT(val);
         NEXT();
     }
-    else if (cmd === 'LET') {
+    else if(cmd === 'LET') {
         let m = args.match(/(\w+)\s*=\s*(.+)/);
-        if (m) {
-            V[m[1]] = EVAL(m[2]);
-        }
+        if(m) V[m[1]] = EVAL(m[2]);
         NEXT();
     }
-    else if (cmd === 'DATA') {
+    else if(cmd === 'DATA') {
         D = args.split(',').map(x => x.trim());
         DP = 0;
         NEXT();
     }
-    else if (cmd === 'READ') {
-        let vlist = args.split(',').map(x => x.trim());
-        vlist.forEach(v => {
-            if (DP < D.length) {
-                V[v] = D[DP++];
-            }
+    else if(cmd === 'READ') {
+        let vars = args.split(',').map(x => x.trim());
+        vars.forEach(v => {
+            if(DP < D.length) V[v] = D[DP++];
         });
         NEXT();
     }
-    else if (cmd === 'IF') {
+    else if(cmd === 'IF') {
         let ti = args.indexOf('THEN');
+        if(ti === -1) { NEXT(); return; }
         let cond = args.substring(0, ti).trim();
-        let thenc = args.substring(ti + 4).trim();
+        let act = args.substring(ti + 4).trim();
         
-        if (COND(cond)) {
-            let tl = parseInt(thenc);
-            if (!isNaN(tl)) {
-                JUMP(tl);
+        if(COND(cond)) {
+            let t = parseInt(act);
+            if(!isNaN(t)) {
+                JUMP(t);
             } else {
-                PROC(thenc.split(' ')[0], thenc.split(' ').slice(1).join(' '), ln);
+                let ap = act.split(' ');
+                PROC(ap[0], ap.slice(1).join(' '), ln);
             }
         } else {
             NEXT();
         }
     }
-    else if (cmd === 'FOR') {
+    else if(cmd === 'FOR') {
         let m = args.match(/(\w+)\s*=\s*(\d+)\s+TO\s+(\d+)/);
-        if (m) {
+        if(m) {
             V[m[1]] = parseInt(m[2]);
-            FS.push({v: m[1], e: parseInt(m[3]), r: LP});
+            FS.push({v:m[1], e:parseInt(m[3]), r:ln});
         }
         NEXT();
     }
-    else if (cmd === 'NEXT') {
-        if (FS.length > 0) {
+    else if(cmd === 'NEXT') {
+        if(FS.length > 0) {
             let f = FS[FS.length-1];
             V[f.v]++;
-            if (V[f.v] <= f.e) {
-                LP = f.r;
-                EXEC(LP);
+            if(V[f.v] <= f.e) {
+                JUMP(f.r);
             } else {
                 FS.pop();
                 NEXT();
             }
-        } else {
-            NEXT();
-        }
+        } else NEXT();
     }
-    else if (cmd === 'GOTO') {
+    else if(cmd === 'GOTO') {
         let t = parseInt(args);
         JUMP(t);
     }
-    else if (cmd === 'GOSUB') {
+    else if(cmd === 'GOSUB') {
         let t = parseInt(args);
         GS.push(LP);
         JUMP(t);
     }
-    else if (cmd === 'RETURN') {
-        if (GS.length > 0) {
+    else if(cmd === 'RETURN') {
+        if(GS.length > 0) {
             LP = GS.pop();
             NEXT();
         }
     }
-    else if (cmd === 'END' || cmd === 'STOP') {
+    else if(cmd === 'END' || cmd === 'STOP') {
         R = false;
-        POUT("END");
+        OUT('END');
     }
-    else if (cmd === 'REM') {
+    else if(cmd === 'REM') {
         NEXT();
     }
     else {
-        POUT("UNKNOWN: " + cmd);
+        OUT('UNKNOWN');
         NEXT();
     }
 }
 
 function NEXT() {
-    if (R) {
-        LP++;
-        if (LP < P.length) {
-            EXEC(LP);
-        } else {
-            R = false;
-            POUT("READY");
-        }
+    if(!R) return;
+    let lines = Object.keys(P).map(Number).sort((a,b) => a-b);
+    let idx = lines.indexOf(LP);
+    if(idx === -1 || idx >= lines.length-1) {
+        R = false;
+        OUT('READY');
+        return;
     }
+    EXEC(lines[idx+1]);
 }
 
-function JUMP(tn) {
-    let idx = P.findIndex(l => l.num === tn);
-    if (idx >= 0) {
-        LP = idx;
-        EXEC(LP);
+function JUMP(t) {
+    if(P[t]) {
+        EXEC(t);
     } else {
-        POUT("LINE " + tn + " NOT FOUND");
+        OUT('LINE ' + t + ' NOT FOUND');
         R = false;
     }
 }
 
 function EVAL(e) {
     e = e.replace(/\$/g, '');
-    for (let v in V) {
+    for(let v in V) {
         let cv = v.replace('$', '');
         e = e.replace(new RegExp(cv, 'g'), V[v]);
     }
@@ -266,25 +266,71 @@ function COND(c) {
     return eval(EVAL(c));
 }
 
+function PROC_CMD() {
+    let cmd = document.getElementById('cmd').value;
+    if(!cmd) return;
+    OUT('>' + cmd);
+    document.getElementById('cmd').value = '';
+    
+    if(/^\d+/.test(cmd)) {
+        let sp = cmd.indexOf(' ');
+        if(sp > 0) {
+            let ln = parseInt(cmd.substring(0, sp));
+            let lt = cmd.substring(sp + 1).trim();
+            if(lt) P[ln] = lt;
+            else delete P[ln];
+        }
+        return;
+    }
+    
+    let parts = cmd.split(' ');
+    let act = parts[0].toUpperCase();
+    
+    if(act === 'RUN') RUN();
+    else if(act === 'LIST') LIST();
+    else if(act === 'NEW') NEW();
+    else if(act === 'SAVE') SAVE();
+    else if(act === 'LOAD') OPEN();
+    else if(act === 'CLEAR') {
+        V = {};
+        D = [];
+        DP = 0;
+        OUT('CLEARED');
+    }
+    else OUT('SYNTAX ERROR');
+}
+
 function SAVE() {
-    let n = prompt('FILENAME:');
-    if (n) {
-        localStorage.setItem('b_' + n, document.getElementById('editor').value);
-        POUT('SAVED: ' + n);
+    let n = prompt('NAME:');
+    if(n) {
+        localStorage.setItem('b_'+n, JSON.stringify(P));
+        OUT('SAVED: ' + n);
     }
 }
 
 function OPEN() {
-    let n = prompt('FILENAME:');
-    if (n) {
-        let s = localStorage.getItem('b_' + n);
-        if (s) {
-            document.getElementById('editor').value = s;
-            POUT('LOADED: ' + n);
+    let n = prompt('NAME:');
+    if(n) {
+        let s = localStorage.getItem('b_'+n);
+        if(s) {
+            P = JSON.parse(s);
+            OUT('LOADED: ' + n);
         } else {
-            POUT('NOT FOUND');
+            OUT('NOT FOUND');
         }
     }
+}
+
+function NEW() {
+    P = {};
+    OUT('NEW PROGRAM');
+}
+
+function LIST() {
+    let lines = Object.keys(P).map(Number).sort((a,b) => a-b);
+    lines.forEach(n => {
+        OUT(n + ' ' + P[n]);
+    });
 }
 </script>
 </body>
