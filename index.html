@@ -11,8 +11,8 @@ body{margin:0;background:#000;color:#0f0;font-family:'1C',monospace}
 .top{display:flex;gap:6px;padding:8px;border-bottom:2px solid #0f0;flex-wrap:wrap;user-select:none}
 button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:'1C';font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px;outline:none;user-select:none}
 select{appearance:none;-webkit-appearance:none;-moz-appearance:none}
-.output{flex:1;padding:12px;overflow:auto;white-space:pre-wrap;font-size:18px;line-height:1.4em}
-input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0;border-radius:0}
+.output{flex:1;padding:12px;overflow-y:auto;white-space:pre;word-break:break-word;font-size:18px;line-height:1.4em}
+input{width:100%;box-sizing:border-box;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0;border-radius:0}
 </style>
 </head>
 <body>
@@ -39,7 +39,7 @@ let s=JSON.parse(localStorage.getItem("saved_program"))
 P=s.P||{};mode=s.mode||0;document.getElementById("mode").value=mode
 }
 function SAVE_LOCAL(){localStorage.setItem("saved_program",JSON.stringify({P:P,mode:mode}))}
-function O(t){out.innerHTML+=t+"\n";out.scrollTop=1e9}
+function O(t){out.innerHTML+=t+"\n";out.scrollTop=out.scrollHeight}
 function CHANGE_MODE(){mode=+document.getElementById("mode").value;SAVE_LOCAL()}
 function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=K();if(!l.length)return;EXEC(l[0])}
 function EXEC(n){if(!R||!P[n]){R=false;return}LP=n;mode?APROC(P[n]):BPROC(P[n])}
@@ -48,12 +48,12 @@ function J(t){P[t]?EXEC(t):(R=false)}
 function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
 function E(e){e=e.replace(/\$/g,"");for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v]);try{return eval(e)||0}catch{return 0}}
 function RND(x){if(x<0)seed=-x;seed=(seed*16807)%2147483647;return seed/2147483647}
-function PRINTLINE(s){let r="",p="",m=0;for(let i=0;i<s.length;i++){let c=s[i];if(c=='"')m^=1;if(!m&&(c==';'||c==',')){r+=E(p);if(c==',')r+="\t";p=""}else p+=c}r+=E(p);out.innerHTML+=r;if(!s.trim().endsWith(";"))out.innerHTML+="\n"}
+function PRINTLINE(s){let r="",p="",m=0;for(let i=0;i<s.length;i++){let c=s[i];if(c=='"')m^=1;if(!m&&(c==';'||c==',')){r+=E(p);if(c==',')r+="\t";p=""}else p+=c}r+=E(p);out.innerHTML+=r;if(!s.trim().endsWith(";"))out.innerHTML+="\n";out.scrollTop=out.scrollHeight}
 function BPROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}else if(w=="GOTO")J(+a);else if(w=="END"||w=="STOP")R=false;else NEXT()}
 function APROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a,p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";waitForInput(p,v,v.endsWith("$")).then(NEXT);return}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):APROC(t)):NEXT()}else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}else if(w=="RESTORE"){DP=0;NEXT()}else if(w=="GOTO")J(+a);else if(w=="GOSUB"){GS.push(LP);J(+a)}else if(w=="RETURN"){LP=GS.pop();NEXT()}else if(w=="END")R=false;else if(w=="HOME"){out.innerHTML="";NEXT()}else NEXT()}
 function waitForInput(promptText,varName,isString){O(promptText);cmd.disabled=false;cmd.focus();return new Promise(resolve=>{inputResolve=(val)=>{V[varName]=isString?val:parseFloat(val)||0;inputResolve=null;resolve()}})}
 function CMD(){let t=cmd.value.trim();cmd.value="";if(!t)return;if(inputResolve){inputResolve(t);return}SAVE_LOCAL();if(/^\d+/.test(t)){let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];SAVE_LOCAL();return}t=="RUN"?RUN():t=="LIST"?LIST():t=="NEW"?NEW():null}
-function LIST(){K().forEach(n=>O(n+" "+P[n]))}
+function LIST(){out.innerHTML="";K().forEach(n=>{O(n+" "+P[n])})}
 function NEW(){P={};out.innerHTML="";SAVE_LOCAL()}
 function SAVE(){let s=K().map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
 function OPEN(){file.click()}
