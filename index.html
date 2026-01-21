@@ -1,131 +1,145 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>BASICEDITOR</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>APPLESoft BASIC</title>
 <style>
-@font-face {
-    font-family: '1C';
-    src: url('1C.ttf') format('truetype');
-}
-
-* {
-    box-sizing: border-box;
-}
-
-body {
-    background: #000;
-    color: #0f0;
-    font-family: '1C', monospace;
-    margin: 0;
-    padding: 0;
-}
-
-.screen {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-}
-
-.top-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px;
-    border-bottom: 2px solid #0f0;
-}
-
-.top-bar button {
-    flex: 1 1 30%;
-    background: #000;
-    color: #0f0;
-    border: 2px solid #0f0;
-    font-family: '1C', monospace;
-    padding: 12px 0;
-    font-size: 16px;
-}
-
-.output {
-    flex: 1;
-    background: #000;
-    padding: 12px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    font-size: 15px;
-}
-
-.input-line {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    border-top: 2px solid #0f0;
-}
-
-.input-line span {
-    font-size: 18px;
-    margin-right: 8px;
-}
-
-.input-line input {
-    flex: 1;
-    background: #000;
-    color: #0f0;
-    border: none;
-    outline: none;
-    font-family: '1C', monospace;
-    font-size: 18px;
-}
+@font-face{font-family:'1C';src:url('1C.ttf') format('truetype')}
+body{margin:0;background:#000;color:#0f0;font-family:'1C',monospace}
+.screen{display:flex;flex-direction:column;height:100vh}
+.top{display:flex;gap:4px;padding:6px;border-bottom:1px solid #0f0}
+button{flex:1;background:#000;color:#0f0;border:1px solid #0f0;font-family:'1C';font-size:12px;padding:6px}
+.output{flex:1;padding:8px;overflow:auto;white-space:pre-wrap;font-size:13px}
+input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:16px;padding:10px;border-top:1px solid #0f0}
 </style>
 </head>
 
-<body>
+<body onclick="cmd.focus()">
 <div class="screen">
-    <div class="top-bar">
-        <button onclick="RUN()">RUN</button>
-        <button onclick="SAVE()">SAVE</button>
-        <button onclick="OPEN()">OPEN</button>
-        <button onclick="NEW()">NEW</button>
-        <button onclick="LIST()">LIST</button>
-    </div>
-    <div class="output" id="output">READY</div>
-    <div class="input-line">
-        <span>&gt;</span>
-        <input type="text" id="cmd" onkeydown="if(event.key=='Enter')PROC_CMD()">
-    </div>
+<div class="top">
+<button onclick="RUN()">RUN</button>
+<button onclick="LIST()">LIST</button>
+<button onclick="NEW()">NEW</button>
+<button onclick="SAVE()">SAVE</button>
+<button onclick="OPEN()">OPEN</button>
+</div>
+<div class="output" id="out"></div>
+<input id="cmd" onkeydown="if(event.key=='Enter')CMD()">
+<input type="file" id="file" accept=".txt" style="display:none" onchange="LOADFILE(this.files[0])">
 </div>
 
 <script>
-let V={},P={},D=[],DP=0,FS=[],GS=[],R=false,LP=0;
-function OUT(t){let o=document.getElementById('output');o.innerHTML+=t+'\n';o.scrollTop=o.scrollHeight;}
-function RUN(){OUT('RUN');V={};D=[];DP=0;FS=[];GS=[];R=true;LP=0;let l=Object.keys(P).map(Number).sort((a,b)=>a-b);if(!l.length){OUT('NO PROGRAM');return;}EXEC(l[0]);}
-function EXEC(ln){if(!R||!P[ln]){OUT('READY');return;}LP=ln;let p=P[ln].split(' ');let c=p[0].toUpperCase();let a=p.slice(1).join(' ');try{PROC(c,a,ln);}catch{OUT('ERROR');R=false;}}
-function PROC(c,a,ln){
-if(c==='PRINT'){let t=a;for(let v in V)t=t.replace(new RegExp(v,'g'),V[v]);OUT(t.replace(/"/g,''));NEXT();}
-else if(c==='INPUT'){let s=a.split(',');if(s[1]){let v=s[1].trim();let r=prompt(s[0].replace(/"/g,''));V[v]=v.endsWith('$')?r:(+r||0);}NEXT();}
-else if(c==='LET'){let m=a.match(/(\w+)\s*=\s*(.+)/);if(m)V[m[1]]=EVAL(m[2]);NEXT();}
-else if(c==='DATA'){D=a.split(',');DP=0;NEXT();}
-else if(c==='READ'){a.split(',').forEach(v=>{if(DP<D.length)V[v.trim()]=D[DP++];});NEXT();}
-else if(c==='IF'){let i=a.indexOf('THEN');if(i<0){NEXT();return;}let cond=a.slice(0,i);let act=a.slice(i+4);if(COND(cond)){let t=parseInt(act);isNaN(t)?PROC(...act.split(' '),ln):JUMP(t);}else NEXT();}
-else if(c==='FOR'){let m=a.match(/(\w+)\s*=\s*(\d+)\s+TO\s+(\d+)/);if(m){V[m[1]]=+m[2];FS.push({v:m[1],e:+m[3],r:ln});}NEXT();}
-else if(c==='NEXT'){if(FS.length){let f=FS.at(-1);V[f.v]++;V[f.v]<=f.e?JUMP(f.r):(FS.pop(),NEXT());}else NEXT();}
-else if(c==='GOTO')JUMP(+a);
-else if(c==='GOSUB'){GS.push(LP);JUMP(+a);}
-else if(c==='RETURN'){if(GS.length){LP=GS.pop();NEXT();}}
-else if(c==='END'||c==='STOP'){R=false;OUT('END');}
-else if(c==='REM')NEXT();
-else{OUT('UNKNOWN');NEXT();}
+let P={},V={},D=[],DP=0,FS=[],GS=[],R=false,LP=0,seed=Math.random()
+
+function O(t){out.innerHTML+=t+"\n";out.scrollTop=1e9}
+
+function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=K();if(!l.length)return;EXEC(l[0])}
+function EXEC(n){if(!R||!P[n]){R=false;return}LP=n;APROC(P[n])}
+function NEXT(){let l=K();let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false)}
+function J(t){P[t]?EXEC(t):(R=false)}
+function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
+
+function E(e){
+e=e.replace(/\$/g,"")
+for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v])
+return eval(e)
 }
-function NEXT(){if(!R)return;let l=Object.keys(P).map(Number).sort((a,b)=>a-b);let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false,OUT('READY'));}
-function JUMP(t){P[t]?EXEC(t):(OUT('LINE '+t+' NOT FOUND'),R=false);}
-function EVAL(e){e=e.replace(/\$/g,'');for(let v in V)e=e.replace(new RegExp(v.replace('$',''),'g'),V[v]);try{return eval(e)||0}catch{return e}}
-function COND(c){return eval(EVAL(c.replace(/=/g,'==')))}
-function PROC_CMD(){let c=cmd.value;if(!c)return;OUT('>'+c);cmd.value='';if(/^\d+/.test(c)){let i=c.indexOf(' ');let n=+c.slice(0,i);let t=c.slice(i+1).trim();t?P[n]=t:delete P[n];return;}let a=c.split(' ')[0].toUpperCase();a==='RUN'?RUN():a==='LIST'?LIST():a==='NEW'?NEW():a==='SAVE'?SAVE():a==='LOAD'?OPEN():OUT('SYNTAX ERROR');}
-function SAVE(){let n=prompt('NAME:');if(n){localStorage.setItem('b_'+n,JSON.stringify(P));OUT('SAVED');}}
-function OPEN(){let n=prompt('NAME:');let s=localStorage.getItem('b_'+n);s?(P=JSON.parse(s),OUT('LOADED')):OUT('NOT FOUND');}
-function NEW(){P={};OUT('NEW PROGRAM');}
-function LIST(){Object.keys(P).map(Number).sort((a,b)=>a-b).forEach(n=>OUT(n+' '+P[n]));}
+
+function RND(x){
+if(x<0)seed=-x
+seed=(seed*16807)%2147483647
+return seed/2147483647
+}
+
+function PRINTLINE(s){
+let r="",p="",m=0
+for(let i=0;i<s.length;i++){
+let c=s[i]
+if(c=='"')m^=1
+if(!m&&(c==';'||c==',')){
+r+=E(p)
+if(c==',')r+="\t"
+p=""
+}else p+=c
+}
+r+=E(p)
+out.innerHTML+=r
+if(!s.trim().endsWith(";"))out.innerHTML+="\n"
+}
+
+function APROC(line){
+let s=line.trim()
+let w=s.split(" ")[0].toUpperCase()
+let a=s.slice(w.length).trim()
+
+if(w=="PRINT"){PRINTLINE(a);NEXT()}
+else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
+else if(w=="INPUT"){
+let v=a.includes(";")?a.split(";")[1].trim():a
+let p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?"
+let r=prompt(p)
+V[v]=v.endsWith("$")?r:parseFloat(r)||0
+NEXT()
+}
+else if(w=="IF"){
+let i=a.toUpperCase().indexOf("THEN")
+let c=a.slice(0,i)
+let t=a.slice(i+4).trim()
+if(E(c)){
+if(/^\d+/.test(t))J(+t)
+else APROC(t)
+}else NEXT()
+}
+else if(w=="FOR"){
+let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i)
+let v=m[1],s=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1
+V[v]=s
+FS.push({v:v,e:e,s:st,l:LP})
+NEXT()
+}
+else if(w=="NEXT"){
+let f=FS[FS.length-1]
+V[f.v]+=f.s
+if((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))EXEC(f.l)
+else{FS.pop();NEXT()}
+}
+else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}
+else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}
+else if(w=="RESTORE"){DP=0;NEXT()}
+else if(w=="GOTO")J(+a)
+else if(w=="GOSUB"){GS.push(LP);J(+a)}
+else if(w=="RETURN"){LP=GS.pop();NEXT()}
+else if(w=="END"){R=false}
+else if(w=="STOP"){R=false}
+else if(w=="HOME"){out.innerHTML="";NEXT()}
+else NEXT()
+}
+
+function CMD(){
+let t=cmd.value.trim();cmd.value="";if(!t)return;O(t)
+if(/^\d+/.test(t)){let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];return}
+t=="RUN"?RUN():t=="LIST"?LIST():t=="NEW"?NEW():null
+}
+
+function LIST(){K().forEach(n=>O(n+" "+P[n]))}
+function NEW(){P={};out.innerHTML=""}
+
+function SAVE(){
+let s=K().map(n=>n+" "+P[n]).join("\n")
+let b=new Blob([s])
+let a=document.createElement("a")
+a.href=URL.createObjectURL(b)
+a.download="program.txt"
+a.click()
+}
+
+function OPEN(){file.click()}
+function LOADFILE(f){
+let r=new FileReader()
+r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)})}
+r.readAsText(f)
+}
 </script>
 </body>
 </html>
