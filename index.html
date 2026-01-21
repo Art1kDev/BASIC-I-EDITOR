@@ -15,7 +15,6 @@ select{appearance:none;-webkit-appearance:none;-moz-appearance:none}
 input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:16px;padding:10px;border-top:1px solid #0f0}
 </style>
 </head>
-
 <body onclick="cmd.focus()">
 <div class="screen">
 <div class="top">
@@ -23,8 +22,8 @@ input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family
 <button onclick="LIST()">LIST</button>
 <button onclick="NEW()">NEW</button>
 <select id="mode" onchange="CHANGE_MODE()">
-  <option value="0">BASIC</option>
-  <option value="1">AppleSoft BASIC</option>
+<option value="0">OLD BASIC</option>
+<option value="1">APPLESOFT BASIC</option>
 </select>
 <button onclick="SAVE()">SAVE</button>
 <button onclick="OPEN()">OPEN</button>
@@ -33,92 +32,28 @@ input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family
 <input id="cmd" onkeydown="if(event.key=='Enter')CMD()">
 <input type="file" id="file" accept=".txt" style="display:none" onchange="LOADFILE(this.files[0])">
 </div>
-
 <script>
 let P={},V={},D=[],DP=0,FS=[],GS=[],R=false,LP=0,mode=0,seed=Math.random()
-
 if(localStorage.getItem("saved_program")){
-  let s=JSON.parse(localStorage.getItem("saved_program"))
-  P=s.P||{};mode=s.mode||0;document.getElementById("mode").value=mode
+let s=JSON.parse(localStorage.getItem("saved_program"))
+P=s.P||{};mode=s.mode||0;document.getElementById("mode").value=mode
 }
-
 function SAVE_LOCAL(){localStorage.setItem("saved_program",JSON.stringify({P:P,mode:mode}))}
-
 function O(t){out.innerHTML+=t+"\n";out.scrollTop=1e9}
-
 function CHANGE_MODE(){mode=+document.getElementById("mode").value;SAVE_LOCAL()}
-
 function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=K();if(!l.length)return;EXEC(l[0])}
 function EXEC(n){if(!R||!P[n]){R=false;return}LP=n;mode?APROC(P[n]):BPROC(P[n])}
 function NEXT(){let l=K();let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false)}
 function J(t){P[t]?EXEC(t):(R=false)}
 function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
-
-function E(e){
-e=e.replace(/\$/g,"")
-for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v])
-try{return eval(e)||0}catch{return 0}
-}
-
-function RND(x){
-if(x<0)seed=-x
-seed=(seed*16807)%2147483647
-return seed/2147483647
-}
-
-function PRINTLINE(s){
-let r="",p="",m=0
-for(let i=0;i<s.length;i++){
-let c=s[i]
-if(c=='"')m^=1
-if(!m&&(c==';'||c==',')){
-r+=E(p)
-if(c==',')r+="\t"
-p=""
-}else p+=c
-}
-r+=E(p)
-out.innerHTML+=r
-if(!s.trim().endsWith(";"))out.innerHTML+="\n"
-}
-
-function BPROC(line){
-let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim()
-if(w=="PRINT"){PRINTLINE(a);NEXT()}
-else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
-else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}
-else if(w=="GOTO")J(+a)
-else if(w=="END"||w=="STOP")R=false
-else NEXT()
-}
-
-function APROC(line){
-let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim()
-if(w=="PRINT"){PRINTLINE(a);NEXT()}
-else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
-else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a, p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";let r=prompt(p);V[v]=v.endsWith("$")?r:parseFloat(r)||0;NEXT()}
-else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):APROC(t)):NEXT()}
-else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}
-else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}
-else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}
-else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}
-else if(w=="RESTORE"){DP=0;NEXT()}
-else if(w=="GOTO")J(+a)
-else if(w=="GOSUB"){GS.push(LP);J(+a)}
-else if(w=="RETURN"){LP=GS.pop();NEXT()}
-else if(w=="END")R=false
-else if(w=="HOME"){out.innerHTML="";NEXT()}
-else NEXT()
-}
-
-function CMD(){let t=cmd.value.trim();cmd.value="";if(!t)return;SAVE_LOCAL()
-if(/^\d+/.test(t)){let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];SAVE_LOCAL();return}
-t=="RUN"?RUN():t=="LIST"?LIST():t=="NEW"?NEW():null
-}
-
+function E(e){e=e.replace(/\$/g,"");for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v]);try{return eval(e)||0}catch{return 0}}
+function RND(x){if(x<0)seed=-x;seed=(seed*16807)%2147483647;return seed/2147483647}
+function PRINTLINE(s){let r="",p="",m=0;for(let i=0;i<s.length;i++){let c=s[i];if(c=='"')m^=1;if(!m&&(c==';'||c==',')){r+=E(p);if(c==',')r+="\t";p=""}else p+=c}r+=E(p);out.innerHTML+=r;if(!s.trim().endsWith(";"))out.innerHTML+="\n"}
+function BPROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}else if(w=="GOTO")J(+a);else if(w=="END"||w=="STOP")R=false;else NEXT()}
+function APROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a,p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";let r=prompt(p);V[v]=v.endsWith("$")?r:parseFloat(r)||0;NEXT()}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):APROC(t)):NEXT()}else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}else if(w=="RESTORE"){DP=0;NEXT()}else if(w=="GOTO")J(+a);else if(w=="GOSUB"){GS.push(LP);J(+a)}else if(w=="RETURN"){LP=GS.pop();NEXT()}else if(w=="END")R=false;else if(w=="HOME"){out.innerHTML="";NEXT()}else NEXT()}
+function CMD(){let t=cmd.value.trim();cmd.value="";if(!t)return;SAVE_LOCAL();if(/^\d+/.test(t)){let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1);r?P[n]=r:delete P[n];SAVE_LOCAL();return}t=="RUN"?RUN():t=="LIST"?LIST():t=="NEW"?NEW():null}
 function LIST(){K().forEach(n=>O(n+" "+P[n]))}
 function NEW(){P={};out.innerHTML="";SAVE_LOCAL()}
-
 function SAVE(){let s=K().map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
 function OPEN(){file.click()}
 function LOADFILE(f){let r=new FileReader();r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)});SAVE_LOCAL()};r.readAsText(f)}
