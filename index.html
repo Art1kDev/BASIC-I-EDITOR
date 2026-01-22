@@ -57,63 +57,55 @@ function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
 
 function E(e){
 if(!e)return 0;
-let trimmed=e.trim();
-if(trimmed.startsWith('"')&&trimmed.endsWith('"'))return trimmed.slice(1,-1);
-if(/^-?\d+(\.\d+)?$/.test(trimmed))return parseFloat(trimmed);
-let expr=e;
-for(let v in V){
-let val=V[v];
-let regex=new RegExp('\\b'+v.replace("$","")+'\\b','g');
-expr=expr.replace(regex,val);}
-expr=expr.trim();
-if(/^-?\d+(\.\d+)?$/.test(expr))return parseFloat(expr);
+e=e.trim();
+if(e.startsWith('"')&&e.endsWith('"'))return e.slice(1,-1);
+if(/^-?\d+(\.\d+)?$/.test(e))return Number(e);
+for(let v in V)e=e.replace(new RegExp('\\b'+v.replace("$","")+'\\b','g'),V[v]);
 try{
-return eval(expr)||0;
+let r=eval(e);
+if(r===undefined)return 0;
+return r;
 }catch{return 0;}}
 
 function RND(x){if(x<0)seed=-x;seed=(seed*16807)%2147483647;return seed/2147483647}
 
 function PRINTLINE(s){
 if(!s)return;
-let result="";
-let inQuotes=false;
-let currentPart="";
+let r="",p="",inq=false;
 for(let i=0;i<s.length;i++){
 let c=s[i];
-if(c==='"'){inQuotes=!inQuotes;}
-if(!inQuotes&&(c===';'||c===',')){
-let val=E(currentPart);
-result+=val;
-if(c===',')result+="\t";
-currentPart="";
-}else{currentPart+=c;}}
-if(currentPart){
-let val=E(currentPart);
-result+=val;}
-out.innerHTML+=result;
+if(c=='"')inq=!inq;
+if(!inq&&(c==';'||c==',')){
+r+=E(p);
+if(c==',')r+="\t";
+p="";
+}else p+=c;
+}
+r+=E(p);
+out.innerHTML+=r;
 if(!s.trim().endsWith(";"))out.innerHTML+="\n";
 out.scrollTop=1e9;}
 
 function BPROC(line){
 let s=line.trim();
 if(!s){NEXT();return;}
-let space=s.indexOf(" ");
-let w=space>0?s.slice(0,space).toUpperCase():s.toUpperCase();
-let a=space>0?s.slice(space+1).trim():"";
+let sp=s.indexOf(" ");
+let w=sp>0?s.slice(0,sp).toUpperCase():s.toUpperCase();
+let a=sp>0?s.slice(sp+1).trim():"";
 if(w=="PRINT"){PRINTLINE(a);NEXT();}
 else if(w=="LET"){
 let eq=a.indexOf("=");
 if(eq>0){
-let name=a.slice(0,eq).trim();
-let val=E(a.slice(eq+1).trim());
-V[name]=val;}
+let n=a.slice(0,eq).trim();
+let v=a.slice(eq+1).trim();
+V[n]=E(v);}
 NEXT();}
 else if(w=="IF"){
-let then=a.toUpperCase().indexOf("THEN");
-if(then>0){
-let cond=a.slice(0,then).trim();
-let target=a.slice(then+4).trim();
-if(E(cond)){J(+target);}else{NEXT();}}
+let th=a.toUpperCase().indexOf("THEN");
+if(th>0){
+let c=a.slice(0,th).trim();
+let t=a.slice(th+4).trim();
+if(E(c)){J(+t);}else{NEXT();}}
 else{NEXT();}}
 else if(w=="GOTO"){J(+a);}
 else if(w=="END"||w=="STOP"){R=false;}
@@ -122,39 +114,39 @@ else{NEXT();}}
 function APROC(line){
 let s=line.trim();
 if(!s){NEXT();return;}
-let space=s.indexOf(" ");
-let w=space>0?s.slice(0,space).toUpperCase():s.toUpperCase();
-let a=space>0?s.slice(space+1).trim():"";
+let sp=s.indexOf(" ");
+let w=sp>0?s.slice(0,sp).toUpperCase():s.toUpperCase();
+let a=sp>0?s.slice(sp+1).trim():"";
 if(w=="PRINT"){PRINTLINE(a);NEXT();}
 else if(w=="LET"){
 let eq=a.indexOf("=");
 if(eq>0){
-let name=a.slice(0,eq).trim();
-let val=E(a.slice(eq+1).trim());
-V[name]=val;}
+let n=a.slice(0,eq).trim();
+let v=a.slice(eq+1).trim();
+V[n]=E(v);}
 NEXT();}
 else if(w=="INPUT"){
-let semicolon=a.includes(";");
-let prompt=semicolon?a.split(";")[0].replace(/"/g,""):"?";
-let name=semicolon?a.split(";")[1].trim():a;
-let isString=name.endsWith("$");
-O(prompt);
+let sc=a.includes(";");
+let p=sc?a.split(";")[0].replace(/"/g,""):"?";
+let n=sc?a.split(";")[1].trim():a;
+let st=n.endsWith("$");
+O(p);
 cmd.disabled=false;
 cmd.focus();
-inputResolve=function(val){
-if(isString)V[name]=val;
-else V[name]=parseFloat(val)||0;
+inputResolve=function(v){
+if(st)V[n]=v;
+else V[n]=Number(v)||0;
 inputResolve=null;
 NEXT();};
 return;}
 else if(w=="IF"){
-let then=a.toUpperCase().indexOf("THEN");
-if(then>0){
-let cond=a.slice(0,then).trim();
-let target=a.slice(then+4).trim();
-if(E(cond)){
-if(/^\d+$/.test(target))J(+target);
-else APROC(target);
+let th=a.toUpperCase().indexOf("THEN");
+if(th>0){
+let c=a.slice(0,th).trim();
+let t=a.slice(th+4).trim();
+if(E(c)){
+if(/^\d+$/.test(t))J(+t);
+else APROC(t);
 }else{NEXT();}}
 else{NEXT();}}
 else if(w=="FOR"){
@@ -179,8 +171,8 @@ D=D.concat(a.split(",").map(x=>x.trim()));
 NEXT();}
 else if(w=="READ"){
 a.split(",").forEach(v=>{
-let name=v.trim();
-if(DP<D.length){V[name]=D[DP++];}});
+let n=v.trim();
+if(DP<D.length){V[n]=D[DP++];}});
 NEXT();}
 else if(w=="RESTORE"){
 DP=0;
