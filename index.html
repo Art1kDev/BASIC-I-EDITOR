@@ -10,25 +10,25 @@ body{margin:0;background:#000;color:#0f0;font-family:'1C',monospace}
 .screen{display:flex;flex-direction:column;height:100vh}
 .top{display:flex;gap:6px;padding:8px;border-bottom:2px solid #0f0;flex-wrap:wrap;user-select:none}
 button,select{background:#000;color:#0f0;border:2px solid #0f0;font-family:'1C';font-size:16px;padding:8px 12px;cursor:pointer;border-radius:6px;outline:none;user-select:none}
-select{appearance:none;-webkit-appearance:none;-moz-appearance:none}
+select{appearance:none}
 .output{flex:1;padding:12px;overflow:auto;white-space:pre-wrap;font-size:18px;line-height:1.4em}
-input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0;border-radius:0}
+input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family:'1C';font-size:20px;padding:14px;border-top:2px solid #0f0}
 </style>
 </head>
 <body>
 <div class="screen">
 <div class="top">
-<button tabindex="-1" onclick="RUN();blurInput()">RUN</button>
-<button tabindex="-1" onclick="LIST();blurInput()">LIST</button>
-<button tabindex="-1" onclick="NEW();blurInput()">NEW</button>
-<select id="mode" tabindex="-1" onchange="CHANGE_MODE();blurInput()">
+<button onclick="RUN();blurInput()">RUN</button>
+<button onclick="LIST();blurInput()">LIST</button>
+<button onclick="NEW();blurInput()">NEW</button>
+<select id="mode" onchange="CHANGE_MODE();blurInput()">
 <option value="0">OLD BASIC</option>
 <option value="1">APPLESOFT BASIC</option>
 <option value="2">ASM</option>
 <option value="3">C</option>
 </select>
-<button tabindex="-1" onclick="SAVE();blurInput()">SAVE</button>
-<button tabindex="-1" onclick="OPEN();blurInput()">OPEN</button>
+<button onclick="SAVE();blurInput()">SAVE</button>
+<button onclick="OPEN();blurInput()">OPEN</button>
 </div>
 <div class="output" id="out"></div>
 <input id="cmd" onkeydown="if(event.key=='Enter')CMD()">
@@ -36,324 +36,114 @@ input{width:100%;background:#000;color:#0f0;border:none;outline:none;font-family
 </div>
 <script>
 let P={},V={},D=[],DP=0,FS=[],GS=[],R=false,LP=0,mode=0,seed=Math.random(),inputResolve=null
-let asmReg={A:0,B:0,C:0,D:0,SI:0,DI:0,SP:1000,IP:0,F:0}
-let asmMem=new Array(65536).fill(0)
-let asmLines=[],asmLab={},asmRun=false,asmStack=[]
-let cVars={},cStack=[],cFuncs={},cRun=false
 if(localStorage.getItem("saved_program")){
 let s=JSON.parse(localStorage.getItem("saved_program"))
-P=s.P||{};mode=s.mode||0;document.getElementById("mode").value=mode
+P=s.P||{};mode=s.mode||0
+document.getElementById("mode").value=mode
 }
-function SAVE_LOCAL(){localStorage.setItem("saved_program",JSON.stringify({P:P,mode:mode}))}
+function SAVE_LOCAL(){localStorage.setItem("saved_program",JSON.stringify({P,mode}))}
 function O(t){out.innerHTML+=t+"\n";out.scrollTop=1e9}
-function CHANGE_MODE(){mode=+document.getElementById("mode").value;SAVE_LOCAL()}
-function RUN(){
-if(mode==2){asmCompile();asmRun=true;asmExec();return}
-if(mode==3){cCompile();cRun=true;cExec();return}
-V={};DP=0;FS=[];GS=[];R=true;let l=K();if(!l.length)return;EXEC(l[0])
-}
+function CHANGE_MODE(){mode=+modeSel.value;SAVE_LOCAL()}
+function RUN(){V={};DP=0;FS=[];GS=[];R=true;let l=K();if(l.length)EXEC(l[0])}
 function EXEC(n){if(!R||!P[n]){R=false;return}LP=n;mode==1?APROC(P[n]):BPROC(P[n])}
-function NEXT(){let l=K();let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):(R=false)}
-function J(t){P[t]?EXEC(t):(R=false)}
+function NEXT(){let l=K();let i=l.indexOf(LP);i>=0&&i<l.length-1?EXEC(l[i+1]):R=false}
+function J(t){P[t]?EXEC(t):R=false}
 function K(){return Object.keys(P).map(Number).sort((a,b)=>a-b)}
-function E(e){e=e.replace(/\$/g,"");for(let v in V)e=e.replace(new RegExp(v.replace("$",""),"g"),V[v]);try{return eval(e)||0}catch{return 0}}
-function RND(x){if(x<0)seed=-x;seed=(seed*16807)%2147483647;return seed/2147483647}
-function PRINTLINE(s){let r="",p="",m=0;for(let i=0;i<s.length;i++){let c=s[i];if(c=='"')m^=1;if(!m&&(c==';'||c==',')){r+=E(p);if(c==',')r+="\t";p=""}else p+=c}r+=E(p);out.innerHTML+=r;if(!s.trim().endsWith(";"))out.innerHTML+="\n"}
-function BPROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}else if(w=="GOTO")J(+a);else if(w=="END"||w=="STOP")R=false;else NEXT()}
-function APROC(line){let s=line.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim();if(w=="PRINT"){PRINTLINE(a);NEXT()}else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}else if(w=="INPUT"){let v=a.includes(";")?a.split(";")[1].trim():a,p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?";waitForInput(p,v,v.endsWith("$")).then(NEXT);return}else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");let t=a.slice(i+4).trim();E(a.slice(0,i))?(/^\d+/.test(t)?J(+t):APROC(t)):NEXT()}else if(w=="FOR"){let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i);let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1;V[v]=s_;FS.push({v:v,e:e,s:st,l:LP});NEXT()}else if(w=="NEXT"){let f=FS[FS.length-1];V[f.v]+=f.s;((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())}else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}else if(w=="RESTORE"){DP=0;NEXT()}else if(w=="GOTO")J(+a);else if(w=="GOSUB"){GS.push(LP);J(+a)}else if(w=="RETURN"){LP=GS.pop();NEXT()}else if(w=="END")R=false;else if(w=="HOME"){out.innerHTML="";NEXT()}else NEXT()}
-
-function asmCompile(){
-asmLines=[];asmLab={}
-let ls=Object.values(P).sort((a,b)=>parseInt(a.split(' ')[0])-parseInt(b.split(' ')[0]))
-ls.forEach(l=>{
-let c=l.trim()
-if(c.includes(':')){
-let lb=c.split(':')[0].trim()
-asmLab[lb]=asmLines.length
-c=c.split(':').slice(1).join(':').trim()
-}
-if(c)asmLines.push(c)
-})
-}
-
-function asmExec(){
-asmReg.IP=0;asmReg.F=0
-out.innerHTML="ASM START\n"
-function step(){
-if(asmReg.IP>=asmLines.length||!asmRun){
-asmRun=false;O("ASM END");return
-}
-let l=asmLines[asmReg.IP]
-let p=l.split(/\s+/)
-let op=p[0].toUpperCase()
-let a=p.slice(1).join(' ').split(',')
-try{
-if(op=="MOV"){
-let d=a[0].trim()
-let s=a[1].trim()
-let v=asmVal(s)
-asmSet(d,v)
-}
-else if(op=="ADD"){
-let d=a[0].trim()
-let s=a[1].trim()
-let v1=asmVal(d)
-let v2=asmVal(s)
-asmSet(d,v1+v2)
-asmFlag(v1+v2)
-}
-else if(op=="SUB"){
-let d=a[0].trim()
-let s=a[1].trim()
-let v1=asmVal(d)
-let v2=asmVal(s)
-asmSet(d,v1-v2)
-asmFlag(v1-v2)
-}
-else if(op=="MUL"){
-let d=a[0].trim()
-let s=a[1].trim()
-let v1=asmVal(d)
-let v2=asmVal(s)
-asmSet(d,v1*v2)
-asmFlag(v1*v2)
-}
-else if(op=="DIV"){
-let d=a[0].trim()
-let s=a[1].trim()
-let v1=asmVal(d)
-let v2=asmVal(s)
-if(v2!=0){
-asmSet(d,Math.floor(v1/v2))
-asmFlag(Math.floor(v1/v2))
-}
-}
-else if(op=="INC"){
-let d=a[0].trim()
-let v=asmVal(d)
-asmSet(d,v+1)
-asmFlag(v+1)
-}
-else if(op=="DEC"){
-let d=a[0].trim()
-let v=asmVal(d)
-asmSet(d,v-1)
-asmFlag(v-1)
-}
-else if(op=="CMP"){
-let v1=asmVal(a[0].trim())
-let v2=asmVal(a[1].trim())
-asmFlag(v1-v2)
-}
-else if(op=="JMP"){
-asmReg.IP=asmLab[a[0].trim()]-1
-}
-else if(op=="JE"||op=="JZ"){
-if(asmReg.F&0x40)asmReg.IP=asmLab[a[0].trim()]-1
-}
-else if(op=="JNE"||op=="JNZ"){
-if(!(asmReg.F&0x40))asmReg.IP=asmLab[a[0].trim()]-1
-}
-else if(op=="CALL"){
-asmStack.push(asmReg.IP)
-asmReg.IP=asmLab[a[0].trim()]-1
-}
-else if(op=="RET"){
-asmReg.IP=asmStack.pop()
-}
-else if(op=="PUSH"){
-asmStack.push(asmVal(a[0].trim()))
-asmReg.SP-=2
-}
-else if(op=="POP"){
-if(asmStack.length>0){
-asmSet(a[0].trim(),asmStack.pop())
-asmReg.SP+=2
-}
-}
-else if(op=="INT"){
-let n=asmVal(a[0].trim())
-if(n==0x10){
-let ah=asmReg.A&0xFF
-if(ah==0x0E){
-let c=String.fromCharCode(asmReg.C&0xFF)
-O("ASM:"+c)
-}
-}
-else if(n==0x21){
-let f=asmReg.A&0xFF
-if(f==0x02){
-let c=String.fromCharCode(asmReg.D&0xFF)
-O("ASM:"+c)
-}
-else if(f==0x09){
-let ad=asmReg.D
-let str=""
-while(asmMem[ad]!=0){
-str+=String.fromCharCode(asmMem[ad])
-ad++
-}
-O("ASM:"+str)
-}
-}
-}
-else if(op=="PRINT"){
-let m=a.join(',').replace(/"/g,'')
-O("ASM:"+m)
-}
-else if(op=="HLT"){
-asmRun=false
-O("ASM HALT")
-return
-}
-}catch(e){O("ASM ERR:"+e);asmRun=false;return}
-asmReg.IP++
-setTimeout(step,50)
-}
-step()
-}
-
-function asmVal(e){
+function E(e){
 e=e.trim()
-if(e in asmReg)return asmReg[e]
-if(/^\d+$/.test(e))return parseInt(e)
-if(/^0x[0-9A-F]+$/i.test(e))return parseInt(e.slice(2),16)
-if(e.startsWith('[')&&e.endsWith(']')){
-let i=e.slice(1,-1)
-let a=asmVal(i)
-return asmMem[a]||0
+if(!e)return ""
+for(let v in V)e=e.replace(new RegExp('\\b'+v+'\\b','g'),V[v])
+try{return eval(e)}catch{return ""}
 }
-if(e in asmLab)return asmLab[e]
-return 0
+function PRINTLINE(s){
+let r="",p="",m=0
+for(let c of s){
+if(c=='"')m^=1
+if(!m&&(c==';'||c==',')){
+if(p.trim()!=="")r+=E(p)
+if(c==',')r+="\t"
+p=""
+}else p+=c
 }
-
-function asmSet(d,v){
-v=v|0
-if(d in asmReg){asmReg[d]=v;return}
-if(d.startsWith('[')&&d.endsWith(']')){
-let i=d.slice(1,-1)
-let a=asmVal(i)
-asmMem[a]=v
-return
+if(p.trim()!=="")r+=E(p)
+out.innerHTML+=r
+if(!s.trim().endsWith(";"))out.innerHTML+="\n"
 }
+function BPROC(l){
+let s=l.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim()
+if(w=="PRINT"){PRINTLINE(a);NEXT()}
+else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
+else if(w=="IF"){let i=a.toUpperCase().indexOf("THEN");E(a.slice(0,i))?J(+a.slice(i+4)):NEXT()}
+else if(w=="GOTO")J(+a)
+else if(w=="END"||w=="STOP")R=false
+else NEXT()
 }
-
-function asmFlag(v){
-v=v|0
-let f=0
-if(v==0)f|=0x40
-if(v<0)f|=0x80
-if(v>32767||v<-32768)f|=0x1
-asmReg.F=f
+function APROC(l){
+let s=l.trim(),w=s.split(" ")[0].toUpperCase(),a=s.slice(w.length).trim()
+if(w=="PRINT"){PRINTLINE(a);NEXT()}
+else if(w=="LET"){let m=a.match(/(.+?)=(.+)/);if(m)V[m[1].trim()]=E(m[2]);NEXT()}
+else if(w=="INPUT"){
+let v=a.includes(";")?a.split(";")[1].trim():a
+let p=a.includes(";")?a.split(";")[0].replace(/"/g,""):"?"
+waitForInput(p,v,v.endsWith("$")).then(NEXT);return
 }
-
-function cCompile(){
-cVars={};cFuncs={};cStack=[]
-let ls=Object.values(P).sort((a,b)=>parseInt(a.split(' ')[0])-parseInt(b.split(' ')[0]))
-let src=ls.join('\n')
-let fr=/(\w+)\s+(\w+)\s*\(([^)]*)\)\s*{([^}]+)}/g
-let m
-while((m=fr.exec(src))!=null){
-let rt=m[1]
-let fn=m[2]
-let pa=m[3]
-let bd=m[4]
-cFuncs[fn]={p:pa.split(',').map(p=>p.trim().split(/\s+/).pop()),b:bd,rt:rt}
+else if(w=="IF"){
+let i=a.toUpperCase().indexOf("THEN")
+let t=a.slice(i+4).trim()
+E(a.slice(0,i))?( /^\d+/.test(t)?J(+t):APROC(t) ):NEXT()
 }
-if(cFuncs['main']){O("C OK")}else{O("C NO main");cRun=false}
+else if(w=="FOR"){
+let m=a.match(/(\w+)\s*=\s*(.+)\s+TO\s+(.+?)(\s+STEP\s+(.+))?$/i)
+let v=m[1],s_=E(m[2]),e=E(m[3]),st=m[5]?E(m[5]):1
+V[v]=s_;FS.push({v,e,s:st,l:LP});NEXT()
 }
-
-function cExec(){
-if(!cFuncs['main'])return
-out.innerHTML="C START\n"
-cFunc('main',[])
+else if(w=="NEXT"){
+let f=FS[FS.length-1]
+V[f.v]+=f.s
+((f.s>0&&V[f.v]<=f.e)||(f.s<0&&V[f.v]>=f.e))?EXEC(f.l):(FS.pop(),NEXT())
 }
-
-function cFunc(fn,ar){
-if(!cFuncs[fn])return 0
-let f=cFuncs[fn]
-let bd=f.b
-let lv={}
-ar.forEach((a,i)=>{
-if(i<f.p.length)lv[f.p[i]]=a
-})
-let ls=bd.split(';').map(l=>l.trim()).filter(l=>l)
-for(let l of ls){
-if(!cRun)break
-l=l.replace(/[{}]/g,'').trim()
-if(!l)continue
-if(l.startsWith('return')){
-let e=l.slice(6).trim()
-return cVal(e,lv)
+else if(w=="DATA"){D=D.concat(a.split(","));NEXT()}
+else if(w=="READ"){a.split(",").forEach(v=>V[v.trim()]=D[DP++]);NEXT()}
+else if(w=="RESTORE"){DP=0;NEXT()}
+else if(w=="GOTO")J(+a)
+else if(w=="GOSUB"){GS.push(LP);J(+a)}
+else if(w=="RETURN"){LP=GS.pop();NEXT()}
+else if(w=="HOME"){out.innerHTML="";NEXT()}
+else if(w=="END")R=false
+else NEXT()
 }
-if(l.startsWith('if')){
-let c=l.match(/if\s*\(([^)]+)\)/)[1]
-if(cVal(c,lv))continue
+function waitForInput(p,v,s){
+O(p);cmd.focus()
+return new Promise(r=>inputResolve=x=>{V[v]=s?x:parseFloat(x)||0;inputResolve=null;r()})
 }
-let dm=l.match(/^(\w+)\s+(\w+)\s*=\s*(.+)$/)
-if(dm){
-let t=dm[1]
-let vn=dm[2]
-let vl=cVal(dm[3],lv)
-lv[vn]=vl
-continue
-}
-let am=l.match(/^(\w+)\s*=\s*(.+)$/)
-if(am){
-let vn=am[1]
-let vl=cVal(am[2],lv)
-if(vn in lv)lv[vn]=vl
-else if(vn in cVars)cVars[vn]=vl
-else lv[vn]=vl
-continue
-}
-let cm=l.match(/^(\w+)\s*\(([^)]*)\)$/)
-if(cm){
-let fn=cm[1]
-let fa=cm[2].split(',').map(a=>cVal(a.trim(),lv))
-if(fn=='printf'){let f=fa[0];O("C:"+f)}
-else if(fn in cFuncs)cFunc(fn,fa)
-continue
-}
-if(l.includes('printf')){O("C:"+l)}
-}
-return 0
-}
-
-function cVal(e,lv){
-e=e.trim()
-if(/^\d+$/.test(e))return parseInt(e)
-if(e in lv)return lv[e]
-if(e in cVars)return cVars[e]
-if(e.startsWith('"')&&e.endsWith('"'))return e.slice(1,-1)
-try{
-let ev=e
-for(let v in lv)ev=ev.replace(new RegExp('\\b'+v+'\\b','g'),lv[v])
-for(let v in cVars)ev=ev.replace(new RegExp('\\b'+v+'\\b','g'),cVars[v])
-return eval(ev)||0
-}catch{return 0}
-}
-
-function waitForInput(promptText,varName,isString){O(promptText);cmd.disabled=false;cmd.focus();return new Promise(resolve=>{inputResolve=(val)=>{V[varName]=isString?val:parseFloat(val)||0;inputResolve=null;resolve()}})}
 function CMD(){
-let t=cmd.value.trim();cmd.value="";if(!t)return
+let t=cmd.value.trim();cmd.value=""
+if(!t)return
 if(inputResolve){inputResolve(t);return}
 SAVE_LOCAL()
 if(/^\d+/.test(t)){
-let i=t.indexOf(" ");let n=+t.slice(0,i);let r=t.slice(i+1)
-r?P[n]=r:delete P[n];SAVE_LOCAL();return
+let i=t.indexOf(" ");let n=+t.slice(0,i)
+i>0?P[n]=t.slice(i+1):delete P[n]
+SAVE_LOCAL();return
 }
 if(t=="RUN")RUN()
 else if(t=="LIST")LIST()
 else if(t=="NEW")NEW()
-else if(t=="STOP"){asmRun=false;cRun=false;R=false;O("STOP")}
 }
 function LIST(){K().forEach(n=>O(n+" "+P[n]))}
 function NEW(){P={};out.innerHTML="";SAVE_LOCAL()}
-function SAVE(){let s=K().map(n=>n+" "+P[n]).join("\n");let b=new Blob([s]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="program.txt";a.click()}
+function SAVE(){
+let s=K().map(n=>n+" "+P[n]).join("\n")
+let b=new Blob([s]);let a=document.createElement("a")
+a.href=URL.createObjectURL(b);a.download="program.txt";a.click()
+}
 function OPEN(){file.click()}
-function LOADFILE(f){let r=new FileReader();r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)});SAVE_LOCAL()};r.readAsText(f)}
-function blurInput(){setTimeout(()=>{document.getElementById("cmd").blur()},50)}
+function LOADFILE(f){
+let r=new FileReader()
+r.onload=()=>{P={};r.result.split("\n").forEach(l=>{let i=l.indexOf(" ");if(i>0)P[+l.slice(0,i)]=l.slice(i+1)});SAVE_LOCAL()}
+r.readAsText(f)
+}
+function blurInput(){setTimeout(()=>cmd.blur(),50)}
 </script>
 </body>
 </html>
